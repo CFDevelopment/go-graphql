@@ -94,9 +94,33 @@ var tutorialType = graphql.NewObject(
 	},
 )
 
+var mutationType = graphql.NewObject(graphql.ObjectConfig{
+	Name: "Mutation",
+	Fields: graphql.Fields{
+		"create": &graphql.Field{
+			Type:        tutorialType,
+			Description: "Create a new Tutorial",
+			Args: graphql.FieldConfigArgument{
+				"title": &graphql.ArgumentConfig{
+					Type: graphql.NewNonNull(graphql.String),
+				},
+			},
+			Resolve: func(params graphql.ResolveParams) (interface{}, error) {
+				tutorial := Tutorial{
+					Title: params.Args["title"].(string),
+				}
+				tutorials = append(tutorials, tutorial)
+				return tutorial, nil
+			},
+		},
+	},
+})
+
+var tutorials = populate()
+
 func main() {
 	// Schema
-	tutorials := populate()
+	// tutorials := populate()
 	fields := graphql.Fields{
 		"tutorial": &graphql.Field{
 			Type: tutorialType,
@@ -138,7 +162,11 @@ func main() {
 		},
 	}
 	rootQuery := graphql.ObjectConfig{Name: "RootQuery", Fields: fields}
-	schemaConfig := graphql.SchemaConfig{Query: graphql.NewObject(rootQuery)}
+	// schemaConfig := graphql.SchemaConfig{Query: graphql.NewObject(rootQuery)}
+	schemaConfig := graphql.SchemaConfig{
+		Query:    graphql.NewObject(rootQuery),
+		Mutation: mutationType,
+	}
 	schema, err := graphql.NewSchema(schemaConfig)
 	if err != nil {
 		log.Fatalf("failed to create new schema, error: %v", err)
@@ -146,17 +174,9 @@ func main() {
 
 	// Query
 	query := `
-		{
-			list {
-				id
+		mutation {
+			create(title: "Hello World") {
 				title
-				comments {
-					body
-				}
-				author {
-					Name
-					Tutorials
-				}
 			}
 		}
 	`
@@ -166,5 +186,22 @@ func main() {
 		log.Fatalf("failed to execute graphql operation, errors: %+v", r.Errors)
 	}
 	rJSON, _ := json.Marshal(r)
-	fmt.Printf("%s \n", rJSON) // {“data”:{“hello”:”world”}}
+	fmt.Printf("%s \n", rJSON)
+
+	// Query
+	query = `
+		{
+			list {
+				id
+				title
+			}
+		}
+	`
+	params = graphql.Params{Schema: schema, RequestString: query}
+	r = graphql.Do(params)
+	if len(r.Errors) > 0 {
+		log.Fatalf("failed to execute graphql operation, errors: %+v", r.Errors)
+	}
+	rJSON, _ = json.Marshal(r)
+	fmt.Printf("%s \n", rJSON)
 }
